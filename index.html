@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>超級新聞人群群二代</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        :root {
+            --primary-color: #940b53; /* Deep Crimson for 'Super' feel */
+            --secondary-color: #e53e3e; /* Red Accent */
+            --background-light: #f4f6f9;
+            --text-dark: #1f2937;
+        }
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: var(--background-light);
+            color: var(--text-dark);
+            min-height: 100vh;
+        }
+        .tab-button {
+            padding: 12px 20px;
+            cursor: pointer;
+            font-weight: 700;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            color: #4b5563;
+            font-size: 1rem;
+            white-space: nowrap;
+        }
+        .tab-button.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+            background-color: #fef2f2; /* Light red/pink background */
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--secondary-color);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .result-card {
+            /* We will manage formatting with internal divs/p tags */
+            text-align: left;
+        }
+        .powerful-title {
+             font-size: 1.6rem;
+             font-weight: 900;
+             margin-top: 2rem;
+             margin-bottom: 0.75rem;
+             color: var(--primary-color);
+             border-bottom: 3px solid #fbd38d; /* Gold-like separator */
+             padding-bottom: 0.25rem;
+        }
+        .title-badge {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 9999px;
+            font-weight: 700;
+            margin-right: 0.75rem;
+            min-width: 80px; /* Reduced min-width slightly */
+            text-align: center;
+        }
+        .title-text {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #1f2937;
+            flex-grow: 1;
+        }
+        .news-content {
+            line-height: 1.8;
+            text-align: justify;
+        }
+        /* New Style for Read-only Input */
+        .readonly-input {
+            background-color: #f3f4f6;
+            cursor: default;
+            color: #6b7280;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-5xl mx-auto">
+        <!-- Header -->
+        <header class="mb-8 p-6 bg-white rounded-xl shadow-2xl border-t-8 border-t-red-600">
+            <h1 class="text-4xl font-extrabold text-gray-900 flex items-center">
+                ✨ 超級新聞人群群二代
+            </h1>
+            <p class="text-gray-600 mt-3 font-medium">
+                專為《ETtoday》風格定制的專業內容生成引擎。
+            </p>
+            <p class="text-xs text-red-500 mt-4 font-mono">
+                【重要】請在程式碼中填入您的 API Key 才能使用。
+            </p>
+        </header>
+
+        <!-- Tab Navigation -->
+        <div class="flex border-b mb-6 bg-white rounded-t-xl shadow-lg overflow-x-auto">
+            <div id="tab-news" class="tab-button active" data-mode="news" onclick="handleTabSwitch('news')">一、重點轉新聞</div>
+            <div id="tab-rewrite_link" class="tab-button" data-mode="rewrite_link" onclick="handleTabSwitch('rewrite_link')">二、新聞改寫</div>
+            <div id="tab-rewrite_pr" class="tab-button" data-mode="rewrite_pr" onclick="handleTabSwitch('rewrite_pr')">三、通稿改寫</div>
+            <div id="tab-interview" class="tab-button" data-mode="interview" onclick="handleTabSwitch('interview')">四、訪綱生成</div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="space-y-6">
+
+            <!-- Dynamic Input Area -->
+            <div id="inputViewContainer" class="p-6 bg-white rounded-xl shadow-2xl min-h-[300px] flex flex-col">
+                <!-- Content will be injected here by JS -->
+            </div>
+
+            <!-- Results Display -->
+            <div id="resultContainer" class="p-6 bg-white rounded-xl shadow-2xl border border-gray-200 min-h-[150px]">
+                <div id="loadingIndicator" class="hidden flex justify-center items-center h-full py-10">
+                    <div class="loader"></div>
+                    <span id="loadingMessage" class="ml-4 text-gray-600">處理中，請稍候...</span>
+                </div>
+                <div id="results" class="result-card text-gray-800">
+                    <p class="text-center text-gray-500 py-10">請選擇功能並輸入內容以開始生成。</p>
+                </div>
+            </div>
+            
+            <!-- Citation Display -->
+            <div id="citationContainer" class="hidden p-4 bg-gray-100 rounded-lg border border-gray-300">
+                <p class="font-semibold text-sm mb-2 text-gray-700">資料來源 (Grounding Sources):</p>
+                <ul id="citationList" class="text-xs text-gray-600 list-disc pl-5 space-y-1"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // 🚨 【重要】請在此處貼上您的 Google Gemini API Key
+        // 如果您在 Canvas 環境中運行，請保持為空
+        const apiKey = "AIzaSyD8qwGksRnr41_B3DO980sD8GzmUbfKet8"; 
+
+        // API URL
+        const apiUrlBase = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+        // DOM 元素
+        const inputViewContainer = document.getElementById('inputViewContainer');
+        const resultsDiv = document.getElementById('results');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const loadingMessage = document.getElementById('loadingMessage');
+        const citationContainer = document.getElementById('citationContainer');
+        const citationList = document.getElementById('citationList');
+        const tabButtons = document.querySelectorAll('.tab-button');
+        
+        let currentMode = 'news';
+        let isProcessing = false;
+
+        // --- 輸入介面模板 ---
+        const inputTemplates = {
+            news: {
+                title: '一、重點轉新聞：輸入事件重點或社群貼文',
+                placeholder: '請貼上您想轉化為新聞稿的事件概要、討論串或貼文...',
+                inputTag: 'textarea',
+                id: 'newsInput',
+                buttonText: '📰 生成新聞',
+                buttonClass: 'bg-red-700 hover:bg-red-800 focus:ring-red-300',
+                options: true
+            },
+            rewrite_link: {
+                title: '二、新聞改寫：填入來源與原文',
+                placeholder: '請貼上要改寫的「新聞全文」或「新聞連結（URL）」。',
+                inputTag: 'textarea',
+                id: 'rewriteLinkInput',
+                buttonText: '🔗 開始改寫並補足內容',
+                buttonClass: 'bg-indigo-700 hover:bg-indigo-800 focus:ring-indigo-300',
+                options: false // Fixed constraints for rewrite
+            },
+            rewrite_pr: {
+                title: '三、通稿改寫：輸入公關提供之新聞稿',
+                placeholder: '請貼上公關提供的新聞稿件內容...',
+                inputTag: 'textarea',
+                id: 'prInput',
+                buttonText: '📝 順稿整理並生成新聞',
+                buttonClass: 'bg-green-700 hover:bg-green-800 focus:ring-green-300',
+                options: true
+            },
+            interview: {
+                title: '四、訪綱生成：輸入藝人名單與重點',
+                placeholder: '請輸入藝人名單 (例如：周杰倫、蔡依林, 或單一藝人)，選填訪問重點...',
+                inputTag: 'textarea',
+                id: 'artistInput',
+                buttonText: '🎤 搜尋事件並生成 20 題訪綱',
+                buttonClass: 'bg-purple-700 hover:bg-purple-800 focus:ring-purple-300',
+                options: false
+            }
+        };
+
+        // --- Tab 切換邏輯 ---
+        window.handleTabSwitch = function(mode) {
+            currentMode = mode;
+            tabButtons.forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.mode === mode) {
+                    btn.classList.add('active');
+                }
+            });
+            renderInputView(mode);
+            resultsDiv.innerHTML = '<p class="text-center text-gray-500 py-10">已切換模式，請輸入內容開始生成。</p>';
+            citationContainer.classList.add('hidden');
+        }
+
+        // --- 渲染輸入介面 ---
+        function renderInputView(mode) {
+            const template = inputTemplates[mode];
+            let inputElement;
+
+            // Common Text Area / Input
+            inputElement = template.inputTag === 'textarea' ?
+                `<textarea id="${template.id}" rows="8" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150" placeholder="${template.placeholder}"></textarea>` :
+                `<input type="text" id="${template.id}" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500 transition duration-150" placeholder="${template.placeholder}">`;
+            
+            // Source Input for Mode 2
+            let sourceInput = '';
+            if (mode === 'rewrite_link') {
+                sourceInput = `
+                    <div class="mt-4">
+                        <label for="sourceName" class="block text-sm font-medium text-gray-700 mb-1">新聞來源 (例如：三立新聞網、ETtoday、鏡週刊)</label>
+                        <input type="text" id="sourceName" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150" placeholder="請填入要改寫的原始新聞媒體名稱或連結來源">
+                    </div>
+                    <div class="mt-4">
+                        <label for="rewriteLinkInput" class="block text-sm font-medium text-gray-700 mb-1">新聞全文或連結</label>
+                        <textarea id="rewriteLinkInput" rows="8" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-150" placeholder="${template.placeholder}"></textarea>
+                    </div>
+                `;
+                inputElement = ''; // Clear default input for mode 2
+            }
+
+            // Options for Modes 1 and 3 (Paragraph Count Selection and Word Count Estimate Display)
+            let optionsHtml = '';
+            if (template.options) {
+                optionsHtml = `
+                    <div class="flex space-x-4 mt-4">
+                        <div class="flex-1">
+                            <label for="paragraphCount" class="block text-sm font-medium text-gray-700 mb-1">✅ 選擇總段落數 (P1 + N 段)</label>
+                            <select id="paragraphCount" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500">
+                                <option value="3">3 段 (短文)</option>
+                                <option value="4" selected>4 段 (標準)</option>
+                                <option value="5">5 段 (中長)</option>
+                                <option value="7">7 段 (長篇)</option>
+                            </select>
+                        </div>
+                        <div class="flex-1">
+                            <label for="wordCountDisplay" class="block text-sm font-medium text-gray-700 mb-1">📏 預估總字數 (依選擇段數計算)</label>
+                            <input type="text" id="wordCountDisplay" class="w-full p-3 border border-gray-300 rounded-lg readonly-input" readonly>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            inputViewContainer.innerHTML = `
+                <h2 class="text-xl font-bold mb-4 text-gray-900">${template.title}</h2>
+                ${sourceInput || inputElement}
+                ${optionsHtml}
+                <button onclick="generateContent('${mode}')" id="actionButton" class="w-full mt-6 text-white font-bold py-3 rounded-lg transition duration-200 focus:outline-none focus:ring-4 ${template.buttonClass}">
+                    ${template.buttonText}
+                </button>
+            `;
+
+            // 【段落數/字數顯示邏輯】
+            if (template.options) {
+                const parCountSelect = document.getElementById('paragraphCount');
+                const wordCountDisplay = document.getElementById('wordCountDisplay');
+                
+                // Helper to calculate word count range based on P count
+                const getWordCountEstimate = (pCount) => {
+                    const p = parseInt(pCount);
+                    if (p === 3) return '約 400 - 500 字'; // P1: ~140, P2+P3: 260~400
+                    if (p === 4) return '約 600 - 750 字'; // P1: ~140, P2-P4: 390~600
+                    if (p === 5) return '約 750 - 950 字';
+                    if (p === 7) return '約 1100 - 1400 字';
+                    return 'N/A';
+                };
+
+                if (parCountSelect && wordCountDisplay) {
+                    const updateDisplay = () => {
+                        const count = parCountSelect.value;
+                        wordCountDisplay.value = getWordCountEstimate(count);
+                    };
+
+                    parCountSelect.addEventListener('change', updateDisplay);
+                    
+                    // Initial update
+                    updateDisplay();
+                }
+            }
+        }
+
+
+        // --- API 呼叫與重試邏輯 (採用強化版本) ---
+        async function fetchWithRetry(url, options, maxRetries = 7, delay = 2000) { 
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.status !== 429 && response.status !== 503) {
+                        return response;
+                    }
+                } catch (error) {
+                    if (i === maxRetries - 1) throw error;
+                }
+                const waitTime = delay * Math.pow(2, i);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+            }
+            throw new Error('API 請求在 7 次重試後仍失敗。錯誤: 伺服器忙碌 (503) 或流量限制 (429)。');
+        }
+
+        // --- 主要內容生成函數 ---
+        window.generateContent = async function(mode) {
+            if (isProcessing) return;
+
+            let inputContent = '';
+            let sourceName = '';
+            let paragraphCount = 4;
+            let systemInstruction = '';
+            let payload = {};
+            let isGroundingEnabled = false;
+
+            // 1. 獲取所有輸入和選項
+            if (mode === 'rewrite_link') {
+                inputContent = document.getElementById('rewriteLinkInput').value.trim();
+                sourceName = document.getElementById('sourceName').value.trim() || '某知名媒體';
+                if (!inputContent) { displayError('請輸入新聞全文或連結。'); return; }
+            } else if (mode === 'news' || mode === 'rewrite_pr' || mode === 'interview') {
+                const elementId = inputTemplates[mode].id;
+                inputContent = document.getElementById(elementId).value.trim();
+                if (!inputContent) { displayError('請輸入內容。'); return; }
+            }
+
+            if (inputTemplates[mode].options) {
+                // 從用戶選擇的下拉選單中獲取段落數
+                paragraphCount = document.getElementById('paragraphCount').value;
+            }
+
+            // 2. 根據模式設定提示和參數
+            switch(mode) {
+                case 'news':
+                    isGroundingEnabled = true;
+                    loadingMessage.textContent = '正在以《ETtoday》風格生成新聞與六標題...';
+                    systemInstruction = `你是專業的娛樂新聞編輯，撰稿風格必須模仿《三立新聞網》記者蔡維歆或《ETtoday新聞雲》記者田暐瑋的筆法：語氣生動、節奏明快、大量使用問號或驚嘆詞、內容具備衝擊性。
+                    
+                    請根據以下嚴格要求輸出：
+                    1. 總段落數：**${paragraphCount}** 段。
+                    2. 首段字數：**不超過 140 字**。
+                    3. 其餘段落字數：**介於 130 字至 200 字之間**。
+                    
+                    請嚴格按照以下六種標題分類和一篇新聞稿內容來輸出結果，使用 Markdown 格式：
+                    
+                    ### 標題列表 (Title List)
+                    1. 正常娛樂標題 (長標，約 25 字): 
+                    2. 正常娛樂標題 (短標，約 15 字): 
+                    3. 藏標型標題 (長標，約 25 字): 標題帶有懸念，不完全透露事件結果。
+                    4. 藏標型標題 (短標，約 15 字): 標題帶有懸念，不完全透露事件結果。
+                    5. 特殊型標題 (長標，約 25 字): 標題使用諧音、梗或流行語等特殊手法。
+                    6. 特殊型標題 (短標，約 15 字): 標題使用諧音、梗或流行語等特殊手法。
+
+                    ### 新聞稿內容 (News Content)
+                    請撰寫一篇完整、專業且符合上述字數限制的新聞稿。
+                    `;
+                    payload = { contents: [{ parts: [{ text: inputContent }] }], systemInstruction: { parts: [{ text: systemInstruction }] }, tools: [{ "google_search": {} }] };
+                    break;
+
+                case 'rewrite_link':
+                    isGroundingEnabled = true;
+                    loadingMessage.textContent = '正在改寫新聞，並以新事件填補 25-30% 內容...';
+                    systemInstruction = `你是專業的娛樂新聞改寫編輯。你的任務是改寫用戶提供的原始新聞全文或連結內容，並遵循以下嚴格要求：
+                    1. 輸出六種標題，格式與「重點轉新聞」模式相同。
+                    2. 輸出總段落數：**固定為 4 段**。
+                    3. 首段字數：**不超過 140 字**。
+                    4. 其餘段落字數：**介於 130 字至 200 字之間**。
+                    5. **尊重媒體**：改寫內容的第二段首句必須著名「根據${sourceName}報導...」或類似語句，以示對競爭媒體的尊重。
+                    6. **內容替換**：改寫內容**不可延用**原始新聞連續 15 字以上。
+                    7. **內容補足**：**必須**利用已知新聞與事件（透過 Grounding 搜尋）來填補或延伸，確保改寫內容中有 **25% 到 30%** 是全新的資訊或觀點。
+
+                    請使用 Markdown 格式輸出「標題列表」和「新聞稿內容」。
+                    `;
+                    // 將輸入內容作為提示詞的一部分
+                    const rewritePrompt = `請根據系統指示，改寫以下內容：\n\n${inputContent}`;
+                    payload = { contents: [{ parts: [{ text: rewritePrompt }] }], systemInstruction: { parts: [{ text: systemInstruction }] }, tools: [{ "google_search": {} }] };
+                    break;
+                
+                case 'rewrite_pr':
+                    loadingMessage.textContent = '正在整理公關稿，重新編排並生成六標題...';
+                    systemInstruction = `你是資深的娛樂公關編輯。你的任務是將公關提供的新聞稿件順稿、整理重點，並重新編排成一篇專業的新聞。如果原文內容完整且無贅詞，可以直接全文照登。
+                    
+                    請根據以下嚴格要求輸出：
+                    1. 總段落數：**${paragraphCount}** 段。
+                    2. 首段字數：**不超過 140 字**。
+                    3. 其餘段落字數：**介於 130 字至 200 字之間**。
+                    
+                    請嚴格按照以下六種標題分類和一篇新聞稿內容來輸出結果，使用 Markdown 格式：
+                    
+                    ### 標題列表 (Title List)
+                    1. 正常娛樂標題 (長標，約 25 字): 
+                    2. 正常娛樂標題 (短標，約 15 字): 
+                    3. 藏標型標題 (長標，約 25 字): 
+                    4. 藏標型標題 (短標，約 15 字): 
+                    5. 特殊型標題 (長標，約 25 字): 
+                    6. 特殊型標題 (短標，約 15 字): 
+
+                    ### 新聞稿內容 (News Content)
+                    請撰寫一篇完整、專業且符合上述字數限制的新聞稿。
+                    `;
+                    payload = { contents: [{ parts: [{ text: inputContent }] }], systemInstruction: { parts: [{ text: systemInstruction }] } };
+                    break;
+
+                case 'interview':
+                    isGroundingEnabled = true;
+                    loadingMessage.textContent = `正在搜尋藝人「${inputContent}」的近期事件，準備 20 題深度訪綱...`;
+                    systemInstruction = `你是經驗豐富的娛樂節目製作人和訪談專家。你的任務是根據提供的藝人名單（${inputContent}）及其所有近期的事件（爭議、負面、正面、新作品、開店等）生成一份包含**精確 20 題**問題的訪綱。訪綱必須涵蓋所有關鍵話題，問題應具備深度和新聞性。
+
+                    輸出格式：請用中文以 Markdown 列表格式輸出這 20 個問題。
+                    `;
+                    const interviewPrompt = `請根據您找到的關於藝人「${inputContent}」的所有近期事件與新聞，生成一份共 20 個問題的完整訪綱。`;
+                    payload = { contents: [{ parts: [{ text: interviewPrompt }] }], systemInstruction: { parts: [{ text: systemInstruction }] }, tools: [{ "google_search": {} }] };
+                    break;
+            }
+
+            // 3. UI 狀態切換
+            isProcessing = true;
+            resultsDiv.innerHTML = '';
+            loadingIndicator.classList.remove('hidden');
+            citationContainer.classList.add('hidden');
+            
+            const button = document.getElementById('actionButton');
+            if (button) {
+                button.disabled = true;
+                button.classList.add('opacity-50');
+                button.textContent = '處理中... 請稍候';
+            }
+
+
+            try {
+                // 4. API 呼叫
+                const response = await fetchWithRetry(apiUrlBase, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                
+                // 5. 解析結果
+                const candidate = result.candidates?.[0];
+                let generatedText = "無法取得內容。";
+                let sources = [];
+
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    generatedText = candidate.content.parts[0].text;
+
+                    // 提取來源 (如果使用 Grounding)
+                    if (isGroundingEnabled) {
+                        const groundingMetadata = candidate.groundingMetadata;
+                        if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                            sources = groundingMetadata.groundingAttributions
+                                .map(attribution => ({
+                                    uri: attribution.web?.uri,
+                                    title: attribution.web?.title,
+                                }))
+                                .filter(source => source.uri && source.title);
+                        }
+                    }
+                } else if (result.error) {
+                    generatedText = `API 錯誤: ${result.error.message}`;
+                } else {
+                    generatedText = "生成內容的結構不正確或為空。";
+                }
+
+                // 6. 顯示結果和來源
+                displayResults(generatedText, sources, mode);
+
+            } catch (error) {
+                displayError(`${error.message}`);
+                console.error("Fetch Error:", error);
+            } finally {
+                // 7. 恢復 UI 狀態
+                isProcessing = false;
+                loadingIndicator.classList.add('hidden');
+                if (button) {
+                    button.disabled = false;
+                    button.classList.remove('opacity-50');
+                    button.textContent = inputTemplates[mode].buttonText;
+                }
+            }
+        }
+
+        // --- 顯示結果和錯誤 (優化區塊：結構化輸出) ---
+        function displayResults(text, sources, mode) {
+            let htmlContent = '';
+            
+            // 處理通用 Markdown 粗體
+            text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+            if (mode === 'news' || mode === 'rewrite_link' || mode === 'rewrite_pr') {
+                
+                // 1. 根據 ### 標題切割內容
+                const parts = text.split(/###\s*(.+?)\s*\n/); 
+                let titleListContent = '';
+                let newsContentBody = '';
+                
+                const titleListIndex = parts.findIndex(part => part.includes('標題列表'));
+                if (titleListIndex !== -1 && titleListIndex + 1 < parts.length) {
+                    titleListContent = parts[titleListIndex + 1];
+                }
+                
+                const newsContentIndex = parts.findIndex(part => part.includes('新聞稿內容'));
+                if (newsContentIndex !== -1 && newsContentIndex + 1 < parts.length) {
+                    newsContentBody = parts[newsContentIndex + 1];
+                }
+                
+                let titlesHtml = '';
+                
+                if (titleListContent) {
+                    // 2. 處理 Titles: 提取每一個標題行，並套用 grid layout
+                    titlesHtml = titleListContent.replace(/(\d+\.\s*)([^:]+?:\s*)(.*?)(?:\n|$)/g, (match, number, type, title) => {
+                        let typeText = type.replace(':', '').trim();
+                        let typeClass = 'bg-gray-200 text-gray-800'; 
+
+                        if (typeText.includes('正常娛樂標題') || typeText.includes('標準娛樂新聞標題')) typeClass = 'bg-red-100 text-red-800';
+                        else if (typeText.includes('藏標')) typeClass = 'bg-yellow-100 text-yellow-800';
+                        else if (typeText.includes('特殊型標題')) typeClass = 'bg-purple-100 text-purple-800';
+
+                        return `
+                            <div class="p-3 bg-white rounded-lg border border-gray-100 shadow-md flex flex-col space-y-2 hover:shadow-lg transition">
+                                <div class="flex items-center">
+                                    <span class="text-lg font-extrabold mr-3 text-gray-400">${number.replace('.', '')}</span>
+                                    <span class="title-badge ${typeClass} whitespace-nowrap">${typeText}</span>
+                                </div>
+                                <p class="title-text text-base font-semibold pl-2 pt-1 leading-snug">${title.trim()}</p>
+                            </div>
+                        `;
+                    });
+                    
+                    // 網格佈局：md:grid-cols-2
+                    htmlContent += `
+                        <h3 class="powerful-title">標題列表 (Title List)</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            ${titlesHtml}
+                        </div>
+                    `;
+                }
+                
+                let newsBodyHtml = '';
+                if (newsContentBody) {
+                    // 3. 處理 News Body: 依據兩次以上換行來分割段落，並用 <p> 標籤包裝
+                    const paragraphs = newsContentBody.trim().split(/\n\n+/).filter(p => p.trim() !== '');
+                    newsBodyHtml = paragraphs.map(p => {
+                        // 確保段落內的單次換行變成 <br>
+                        const formattedParagraph = p.trim().replace(/\n/g, '<br>');
+                        return `<p class="news-content text-gray-700">${formattedParagraph}</p>`;
+                    }).join('');
+                    
+                    htmlContent += `
+                        <h3 class="powerful-title">新聞稿內容 (News Content)</h3>
+                        <div class="space-y-5 mt-4">
+                            ${newsBodyHtml}
+                        </div>
+                    `;
+                }
+                
+            } else if (mode === 'interview') {
+                // Interview mode list logic
+                htmlContent = text.replace(/###\s*(.+?)\s*\n/g, '<h3 class="powerful-title">$1</h3>');
+                htmlContent = htmlContent.replace(/(\d+\.\s+)(.*?)(\n|$)/g, '<p class="mt-3 font-medium text-gray-800"><span class="text-purple-700 font-extrabold">$1</span>$2</p>');
+            } else {
+                // Default formatting for other modes
+                htmlContent = text.replace(/\n/g, '<br>');
+            }
+
+            resultsDiv.innerHTML = `<div class="p-4 bg-gray-50 rounded-lg">${htmlContent}</div>`;
+            
+            // 顯示資料來源
+            if (sources.length > 0) {
+                citationList.innerHTML = sources.map(source => 
+                    `<li><a href="${source.uri}" target="_blank" class="text-blue-600 hover:text-blue-800 hover:underline transition">${source.title || '無標題'}</a></li>`
+                ).join('');
+                citationContainer.classList.remove('hidden');
+            } else {
+                citationContainer.classList.add('hidden');
+            }
+        }
+
+        function displayError(message) {
+            resultsDiv.innerHTML = `<div class="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg text-center font-medium">${message}</div>`;
+            citationContainer.classList.add('hidden');
+        }
+
+        // 初始化：首次載入時渲染預設介面 (重點轉新聞)
+        document.addEventListener('DOMContentLoaded', () => {
+            handleTabSwitch('news');
+        });
+
+    </script>
+</body>
+</html>
